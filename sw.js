@@ -1,6 +1,6 @@
 /* Atelier Riviera service worker: keeps the app opening offline.
    Network first (so updates arrive on the next reload), cache as the fallback. */
-const CACHE = 'atelier-riviera-v1';
+const CACHE = 'atelier-riviera-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
@@ -18,6 +18,8 @@ self.addEventListener('fetch', (e) => {
     try {
       const res = await fetch(new Request(req, { cache: 'no-cache' }));
       if (res && res.ok) cache.put(req, res.clone());
+      // If the site itself has moved or is down, keep opening the cached app so Export still works.
+      if (req.mode === 'navigate' && res && (res.status === 404 || res.status >= 500)) { const hit = await cache.match('index.html'); if (hit) return hit; }
       return res;
     } catch (err) {
       const hit = await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' ? await cache.match('index.html') : null);
